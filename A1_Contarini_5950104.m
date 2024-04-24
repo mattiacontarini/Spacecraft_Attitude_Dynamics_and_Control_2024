@@ -93,6 +93,41 @@ hold off
 
 %% Task 4
 
+% Set initial elements of state vector y
+attitude_measurement_error = normrnd(0, deg2rad(0.1));
+theta_1_0 = deg2rad(10) - attitude_measurement_error;
+theta_2_0 = deg2rad(10) - attitude_measurement_error;
+theta_3_0 = deg2rad(10) - attitude_measurement_error;
+angular_velocity_measurement_errors = deg2rad([0.1 -0.1 0.15]);
+omega_1_0 = - n * theta_3_0 - angular_velocity_measurement_errors(1);
+omega_2_0 = -n - angular_velocity_measurement_errors(2);
+omega_3_0 = n * theta_1_0 - angular_velocity_measurement_errors(3);
+Hw_1_0 = 0;
+Hw_2_0 = 0;
+Hw_3_0 = 0;
+
+% Initialize state vector
+y0 = [theta_1_0 theta_2_0 theta_3_0 omega_1_0 omega_2_0 omega_3_0 Hw_1_0 Hw_2_0 Hw_3_0];
+
+[t2, y2] = ode45(@(t, y)fun(y, J, kp, kd, n, Md, H), t_span, y0);
+
+% Plot theta angles over time
+figure(2)
+plot(t2, rad2deg(y2(:,1)), LineWidth=2, Color='blue')
+hold on
+plot(t2, rad2deg(y2(:,2)), LineWidth=2, Color='red')
+plot(t2, rad2deg(y2(:,3)), LineWidth=2, Color='green')
+yline(0.1, Color='black', LineWidth=2)
+legend('\theta_1', '\theta_2', '\theta_3', '\theta = 0.1 deg', fontsize=15)
+xlabel('Integration time  [s]', FontSize=15)
+ylabel('Angle  [deg]', fontsize=15)
+ax = gca(figure(2));
+ax.FontSize = 15;
+grid("on")
+title('Performance of PD controller', FontSize=15)
+saveas(figure(2), 'task.4.pdf')
+hold off
+
 
 %% Functions
 
