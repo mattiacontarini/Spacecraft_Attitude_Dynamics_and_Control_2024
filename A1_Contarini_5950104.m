@@ -25,6 +25,8 @@ Md = [0.001; 0.001; 0.001];
 
 theta_ss = deg2rad([0.1; 0.1; 0.1]); % Required steady-state error
 
+angular_velocity_measurement_errors = deg2rad([0.1 -0.1 0.15]);
+
 damping_ratio = [0.707; 0.707; 0.707];
 
 H = 38.2; % Angular momentum of momentum bias wheel [N*m*s]. Retrieved from
@@ -94,14 +96,12 @@ hold off
 %% Task 4
 
 % Set initial elements of state vector y
-attitude_measurement_error = normrnd(0, deg2rad(0.1));
-theta_1_0 = deg2rad(10) - attitude_measurement_error;
-theta_2_0 = deg2rad(10) - attitude_measurement_error;
-theta_3_0 = deg2rad(10) - attitude_measurement_error;
-angular_velocity_measurement_errors = deg2rad([0.1 -0.1 0.15]);
-omega_1_0 = - n * theta_3_0 - angular_velocity_measurement_errors(1);
-omega_2_0 = -n - angular_velocity_measurement_errors(2);
-omega_3_0 = n * theta_1_0 - angular_velocity_measurement_errors(3);
+theta_1_0 = deg2rad(10);
+theta_2_0 = deg2rad(10);
+theta_3_0 = deg2rad(10);
+omega_1_0 = - n * theta_3_0;
+omega_2_0 = -n;
+omega_3_0 = n * theta_1_0;
 Hw_1_0 = 0;
 Hw_2_0 = 0;
 Hw_3_0 = 0;
@@ -109,7 +109,7 @@ Hw_3_0 = 0;
 % Initialize state vector
 y0 = [theta_1_0 theta_2_0 theta_3_0 omega_1_0 omega_2_0 omega_3_0 Hw_1_0 Hw_2_0 Hw_3_0];
 
-[t2, y2] = ode45(@(t, y)fun(y, J, kp, kd, n, Md, H), t_span, y0);
+[t2, y2] = ode45(@(t, y)fun2(y, J, kp, kd, n, Md, H), t_span, y0);
 
 % Plot theta angles over time
 figure(2)
@@ -127,6 +127,9 @@ grid("on")
 title('Performance of PD controller', FontSize=15)
 saveas(figure(2), 'task.4.pdf')
 hold off
+
+
+%% Task 7
 
 
 %% Functions
@@ -155,5 +158,73 @@ omega_dot_2 = (1/J(2, 2)) * (3 * n^2 *(J(3, 3) - J(1, 1)) * theta_2 + Md(2) - Hw
 omega_dot_3 = (1/J(3, 3)) * (Md(3) + omega_1 * H + n * Hw_1 - Hw_dot_3 - (J(1, 1) - J(2, 2))*n*omega_1);
 
 dy = [theta_dot_1; theta_dot_2; theta_dot_3; omega_dot_1; omega_dot_2; omega_dot_3; Hw_dot_1; Hw_dot_2; Hw_dot_3];
+
+end
+
+
+function dy = fun2(y, J, kp, kd, n, Md, H)
+attitude_measurement_error = normrnd(0, deg2rad(0.1), 1, 3);
+
+theta_1 = y(1);
+theta_2 = y(2);
+theta_3 = y(3);
+omega_1 = y(4);
+omega_2 = y(5);
+omega_3 = y(6);
+Hw_1 = y(7);
+Hw_2 = y(8);
+Hw_3 = y(9);
+
+angular_velocity_measurement_errors = deg2rad([0.1, -0.1, 0.15]);
+
+theta_dot_1 = omega_1 + angular_velocity_measurement_errors(1) + n * theta_3;
+theta_dot_2 = omega_2 + angular_velocity_measurement_errors(2) + n;
+theta_dot_3 = omega_3 + angular_velocity_measurement_errors(3) - n * theta_1;
+
+theta_1_measured = theta_1 + attitude_measurement_error(1);
+theta_2_measured = theta_2 + attitude_measurement_error(2);
+theta_3_measured = theta_3 + attitude_measurement_error(3);
+
+Hw_dot_1 = kp(1) * theta_1_measured + kd(1) * theta_dot_1;
+Hw_dot_2 = kp(2) * theta_2_measured + kd(2) * theta_dot_2;
+Hw_dot_3 = kp(3) * theta_3_measured + kd(3) * theta_dot_3;
+
+omega_dot_1 = (1/J(1, 1)) * (Md(1) - 3 * n^2 * (J(2, 2) - J(3, 3)) * theta_1 - (J(2, 2) - J(3, 3)) * n * omega_3 - Hw_dot_1 - omega_3 * H - n*Hw_3);
+omega_dot_2 = (1/J(2, 2)) * (3 * n^2 *(J(3, 3) - J(1, 1)) * theta_2 + Md(2) - Hw_dot_2);
+omega_dot_3 = (1/J(3, 3)) * (Md(3) + omega_1 * H + n * Hw_1 - Hw_dot_3 - (J(1, 1) - J(2, 2))*n*omega_1);
+
+dy = [theta_dot_1; theta_dot_2; theta_dot_3; omega_dot_1; omega_dot_2; omega_dot_3; Hw_dot_1; Hw_dot_2; Hw_dot_3];
+
+end
+
+function dy = fun3(y, J, kp, kd, n, Md, H)
+
+
+end
+
+
+function EKF_single_step(x_0, state_transition_matrix, H_matrix, t_0, t_1, P_0)
+
+x_1 = x_0 + ode45(@(t,x) f(x, [t_0 t_1], x_0));
+Phi_1 = compute_state_transition_matrix(x1)
+P_1 = 
+K_1 = 
+x_11 = x_1 + K_1
+P_11
+end
+
+
+function compute_state_transition_matrix(x)
+
+end
+
+function compute_H_matrix(x)
+
+
+end
+
+
+function dx = f(x)
+
 
 end
