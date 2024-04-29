@@ -285,21 +285,36 @@ Hw_3 = y(9);
 
 angular_velocity_measurement_errors = deg2rad([0.1, -0.1, 0.15]);
 
-theta_dot_1 = omega_1 + angular_velocity_measurement_errors(1) + n * theta_3;
-theta_dot_2 = omega_2 + angular_velocity_measurement_errors(2) + n;
-theta_dot_3 = omega_3 + angular_velocity_measurement_errors(3) - n * theta_1;
+omega_1_measured = omega_1 + angular_velocity_measurement_errors(1);
+omega_2_measured = omega_2 + angular_velocity_measurement_errors(2);
+omega_3_measured = omega_3 + angular_velocity_measurement_errors(3);
 
 theta_1_measured = theta_1 + attitude_measurement_error(1);
 theta_2_measured = theta_2 + attitude_measurement_error(2);
 theta_3_measured = theta_3 + attitude_measurement_error(3);
 
-Hw_dot_1 = kp(1) * theta_1_measured + kd(1) * theta_dot_1;
-Hw_dot_2 = kp(2) * theta_2_measured + kd(2) * theta_dot_2;
-Hw_dot_3 = kp(3) * theta_3_measured + kd(3) * theta_dot_3;
+theta_dot = compute_theta_dot_vector(theta_1, theta_2, theta_3, omega_1, omega_2, omega_3, n);
 
-omega_dot_1 = (1/J(1, 1)) * (Md(1) - 3 * n^2 * (J(2, 2) - J(3, 3)) * theta_1 - (J(2, 2) - J(3, 3)) * n * omega_3 - Hw_dot_1 - omega_3 * H - n*Hw_3);
-omega_dot_2 = (1/J(2, 2)) * (3 * n^2 *(J(3, 3) - J(1, 1)) * theta_2 + Md(2) - Hw_dot_2);
-omega_dot_3 = (1/J(3, 3)) * (Md(3) + omega_1 * H + n * Hw_1 - Hw_dot_3 - (J(1, 1) - J(2, 2))*n*omega_1);
+% So here I use both the measured omega and measured theta to determine the measured theta_dot to give to the controller 
+theta_dot_from_measurements = compute_theta_dot_vector(theta_1_measured, theta_2_measured, theta_3_measured, omega_1_measured, omega_2_measured, omega_3_measured, n);
+
+%theta_dot_1 = omega_1 + angular_velocity_measurement_errors(1) + n * theta_3;
+%theta_dot_2 = omega_2 + angular_velocity_measurement_errors(2) + n;
+%theta_dot_3 = omega_3 + angular_velocity_measurement_errors(3) - n * theta_1;
+
+theta_dot_1 = theta_dot(1);
+theta_dot_2 = theta_dot(2);
+theta_dot_3 = theta_dot(3);
+
+Hw_dot_1 = kp(1) * theta_1_measured + kd(1) * theta_dot_from_measurements(1);
+Hw_dot_2 = kp(2) * theta_2_measured + kd(2) * theta_dot_from_measurements(2);
+Hw_dot_3 = kp(3) * theta_3_measured + kd(3) * theta_dot_from_measurements(3);
+
+omega_dot = compute_omega_dot_vector(theta_1, theta_2, theta_3, omega_1, omega_2, omega_3, J, Hw_dot_1, Hw_dot_2, Hw_dot_3, Hw_1, H, Hw_3, Md, n);
+
+omega_dot_1 = omega_dot(1);
+omega_dot_2 = omega_dot(2);
+omega_dot_3 = omega_dot(3);
 
 dy = [theta_dot_1; theta_dot_2; theta_dot_3; omega_dot_1; omega_dot_2; omega_dot_3; Hw_dot_1; Hw_dot_2; Hw_dot_3];
 
@@ -352,5 +367,30 @@ Phi_dot = reshape(Phi_dot, 36, 1);
 
 dy = [theta_dot_1; theta_dot_2; theta_dot_3; omega_dot_1; omega_dot_2; omega_dot_3; Hw_dot_1; Hw_dot_2; Hw_dot_3; b_dot_1; b_dot_2; b_dot_3; Phi_dot];
 
+end
+
+function theta_dot = compute_theta_dot_vector(theta_1, theta_2, theta_3, omega_1, omega_2, omega_3, n)
+
+v = [sin(theta_3); cos(theta_2)*cos(theta_3); sin(theta_2)*sin(theta_3)];
+
+omega = [omega_1; omega_2; omega_3];
+
+matrix = [cos(theta_2) sin(theta_1)*sin(theta_2) cos(theta_1)*sin(theta_2); 0 cos(theta_1)*cos(theta_2) -sin(theta_1)*cos(theta_2); 0 sin(theta_1) cos(theta_1)];
+
+theta_dot = (1/cos(theta_2)) * matrix * omega + (n/cos(theta_2)) * v;
+
+end
+
+function omega_dot = compute_omega_dot_vector(theta_1, theta_2, theta_3, omega_1, omega_2, omega_3, J, Hw_dot_1, Hw_dot_2, Hw_dot_3, Hw_1, H, Hw_3, Md, n)
+
+C = [cos(theta_2)*cos(theta_3) cos(theta_2)*sin(theta_3) -sin(theta_2);
+    sin(theta_1)*sin(theta_2)*cos(theta_3)-cos(theta_1)*sin(theta_3) sin(theta_1)*sin(theta_2)*sin(theta_3)+cos(theta_1)*cos(theta_3) sin(theta_1)*cos(theta_2);
+    cos(theta_1)*sin(theta_2)*cos(theta_3)+sin(theta_1)*sin(theta_3) cos(theta_1)*sin(theta_2)*sin(theta_3)-sin(theta_1)*cos(theta_3) cos(theta_1)*cos(theta_2)];
+
+omega_dot_1 = (1/J(1, 1)) * (Md(1) - 3 * n^2 * (J(2, 2) - J(3, 3)) * C(2, 3) * C(3, 3) + (J(2, 2) - J(3, 3)) * omega_2 * omega_3 - Hw_dot_1 - omega_3 * H - omega_2*Hw_3);
+omega_dot_2 = (1/J(2, 2)) * (-3 * n^2 * (J(3, 3) - J(1, 1)) * C(3, 3) * C(1, 3) + Md(2) - Hw_dot_2 + (J(3, 3) - J(1, 1)) * omega_3 * omega_1);
+omega_dot_3 = (1/J(3, 3)) * (-3 * n^2 * (J(1, 1) - J(2, 2)) * C(1, 3) * C(2, 3) + Md(3) + omega_1 * H + omega_2 * Hw_1 - Hw_dot_3 + (J(1, 1) - J(2, 2))*omega_2*omega_1);
+
+omega_dot = [omega_dot_1; omega_dot_2; omega_dot_3];
 end
 
